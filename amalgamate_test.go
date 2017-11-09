@@ -17,10 +17,9 @@ func TestAmalgamizer_Apply(t *testing.T) {
 			So(err, ShouldBeNil)
 			Convey("WHEN: Reading a test data", func() {
 				Convey("THEN: Should match", func() {
-					So(outbuf.String(), ShouldEqual, `/*
+					expected := `/*
  * Preamble
  */
-#pragma once
 
 
 #ifndef TEST
@@ -32,7 +31,8 @@ gugugu
 /*
  * Postamble
  */
-`)
+`
+					So(outbuf.String(), ShouldEqual, expected)
 				})
 			})
 		})

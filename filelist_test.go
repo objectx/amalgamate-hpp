@@ -67,25 +67,25 @@ func TestFileList_Register2(t *testing.T) {
 }
 
 func TestFileList_FindIndex(t *testing.T) {
-	Convey("Testing FindIndex", t, func() {
-		prop := func(items []string) bool {
-			var fl FileList
-			//t.Log("items =", items)
-			registerItems(&fl, items)
+	prop := func(items []string) bool {
+		var fl FileList
+		// t.Log("items =", items)
+		registerItems(&fl, items)
 
-			for i, v := range items {
-				idx := fl.FindIndex(v)
-				if idx < 0 {
-					return false
-				}
-				//t.Log("i =", i, " v = ", v, " idx =", idx)
-				if i < idx {
-					t.Log("i =", i, " v =", v, " idx =", idx)
-					return false
-				}
+		for i, v := range items {
+			idx := fl.FindIndex(v)
+			if idx < 0 {
+				return false
 			}
-			return true
+			//t.Log("i =", i, " v = ", v, " idx =", idx)
+			if i < idx {
+				t.Log("i =", i, " v =", v, " idx =", idx)
+				return false
+			}
 		}
+		return true
+	}
+	Convey("Testing FindIndex", t, func() {
 		So(prop, convey.ShouldSucceedForAll, genItems())
 	})
 }

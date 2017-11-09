@@ -27,6 +27,7 @@ var (
 	rxGuardEndif    = regexp.MustCompile(`^\s*#\s*endif\s+/\*\s+(\S+)\s+\*/`)
 	rxLocalInclude  = regexp.MustCompile(`^\s*#\s*include\s+"([^"]+)"`)
 	rxSystemInclude = regexp.MustCompile(`^\s*#\s*include\s+<([^>]+)>`)
+	rxPragmaOnce    = regexp.MustCompile(`^\s*#\s*pragma\s+once\b`)
 )
 
 // Amalgamizer amalgamates supplied *.hpp into single *.hpp file.
@@ -72,9 +73,12 @@ func (a *Amalgamizer) Apply(inputPath string) error {
 			if m != nil {
 				a.state = stateGuardOpen
 				guard = m[1]
-			} else {
-				fmt.Fprintln(a.output, txt)
+				break
 			}
+			if rxPragmaOnce.FindString(txt) != "" {
+				break
+			}
+			fmt.Fprintln(a.output, txt)
 		case stateGuardOpen:
 			m := rxGuardDefine.FindStringSubmatch(txt)
 			if m != nil {
