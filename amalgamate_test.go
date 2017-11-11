@@ -18,8 +18,21 @@ func TestAmalgamizer_Apply(t *testing.T) {
 			Convey("WHEN: Reading a test data", func() {
 				Convey("THEN: Should match", func() {
 					expected := `/*
- * Preamble
+ * Preamble test
  */
+
+/*
+ * Preamble child
+ */
+
+/*
+ * Preamble child2
+ */
+
+/* Body of the child2 */
+
+
+/* Body of the child */
 
 
 #ifndef TEST
@@ -29,7 +42,7 @@ gugugu
 #endif
 
 /*
- * Postamble
+ * Postamble test
  */
 `
 					So(outbuf.String(), ShouldEqual, expected)

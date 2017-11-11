@@ -1,5 +1,5 @@
 /*
- * Preamble
+ * Preamble test
  */
 #pragma once
 #ifndef GUARD_START
@@ -7,6 +7,7 @@
 
 #include <sys/types.h>
 #include "child.hpp"
+#include "child2.hpp"
 
 #ifndef TEST
 mokeke
@@ -16,5 +17,5 @@ gugugu
 
 #endif /* GUARD_START */
 /*
- * Postamble
+ * Postamble test
  */
