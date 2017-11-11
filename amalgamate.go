@@ -4,11 +4,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -85,13 +88,38 @@ func (a *Amalgamizer) Clear() {
 func (a *Amalgamizer) Apply(inputPath string) error {
 	a.Clear()
 	a.sourceRoot = filepath.Dir(inputPath)
-	return a.applyInternal(inputPath)
-}
-
-func (a *Amalgamizer) applyInternal(inputPath string) error {
-	ctx, err := newReadContext(inputPath)
+	r, err := a.applyInternal(inputPath)
 	if err != nil {
 		return err
+	}
+	_, err = io.Copy(a.output, &r.preamble)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(a.output, "#pragma once")
+	b := r.body.Bytes()
+	guard := computeGuard(b, inputPath)
+	fmt.Fprintf(a.output, "#ifndef %s\n", guard)
+	fmt.Fprintf(a.output, "#define %s\t1\n", guard)
+	for _, h := range a.systemIncludes.Items() {
+		fmt.Fprintf(a.output, "#include <%s>\n", h)
+	}
+	_, err = a.output.Write(b)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(a.output, "#endif\t/* %s */\n", guard)
+	_, err = io.Copy(a.output, &r.postamble)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *Amalgamizer) applyInternal(inputPath string) (*includeResult, error) {
+	ctx, err := newReadContext(inputPath)
+	if err != nil {
+		return nil, err
 	}
 	defer ctx.Close()
 	a.contexts = append(a.contexts, ctx)
@@ -100,6 +128,7 @@ func (a *Amalgamizer) applyInternal(inputPath string) error {
 	})()
 	scanner := bufio.NewScanner(ctx.input)
 	var guard string
+	var result includeResult
 	for scanner.Scan() {
 		txt := scanner.Text()
 		switch ctx.state {
@@ -112,7 +141,7 @@ func (a *Amalgamizer) applyInternal(inputPath string) error {
 			if findPragmaOnce(txt) {
 				break
 			}
-			fmt.Fprintln(a.output, txt)
+			fmt.Fprintln(&result.preamble, txt)
 		case stateGuardOpen:
 			if g := findGuardDefine(txt); 0 < len(g) {
 				if g == guard {
@@ -120,11 +149,11 @@ func (a *Amalgamizer) applyInternal(inputPath string) error {
 					break
 				}
 			}
-			return errors.Errorf("missing #define %s just after the #if", guard)
+			return nil, errors.Errorf("missing #define %s just after the #if", guard)
 		case stateBody:
 			if g := findGuardEndif(txt); 0 < len(g) {
 				if g == guard {
-					ctx.state = statePreamble
+					ctx.state = statePostamble
 					break
 				}
 			}
@@ -134,9 +163,13 @@ func (a *Amalgamizer) applyInternal(inputPath string) error {
 					// Newly found local include file.
 					// Expand to here.
 					a.localIncludes.Register(inc)
-					err = a.applyInternal(filepath.Join(a.sourceRoot, inc))
+					r, err := a.applyInternal(filepath.Join(a.sourceRoot, inc))
 					if err != nil {
-						return err
+						return nil, err
+					}
+					err = r.WriteTo(&result.body)
+					if err != nil {
+						return nil, err
 					}
 				}
 				break
@@ -146,14 +179,14 @@ func (a *Amalgamizer) applyInternal(inputPath string) error {
 				a.systemIncludes.Register(inc)
 				break
 			}
-			fmt.Fprintln(a.output, txt)
+			fmt.Fprintln(&result.body, txt)
 		case statePostamble:
-			fmt.Fprintln(a.output, txt)
+			fmt.Fprintln(&result.postamble, txt)
 		default:
 			panic(fmt.Sprintf("unexpected state %v", ctx.state))
 		}
 	}
-	return nil
+	return &result, nil
 }
 
 func findPragmaOnce(line string) bool {
@@ -193,4 +226,32 @@ func findSystemInclude(line string) string {
 		return m[1]
 	}
 	return ""
+}
+
+func computeGuard(b []byte, filePath string) string {
+	mapper := func(r rune) rune {
+		switch {
+		case 'A' <= r && r <= 'Z', 'a' <= r && r <= 'z', '0' <= r && r <= '9':
+			break
+		default:
+			r = '_'
+		}
+		return r
+	}
+	g := strings.Map(mapper, filepath.Base(filePath))
+	return fmt.Sprintf("%s__%x", g, sha256.Sum256(b))
+}
+
+type includeResult struct {
+	preamble  bytes.Buffer
+	body      bytes.Buffer
+	postamble bytes.Buffer
+}
+
+func (r *includeResult) WriteTo(w io.Writer) error {
+	var err error
+	_, err = io.Copy(w, &r.preamble)
+	_, err = io.Copy(w, &r.body)
+	_, err = io.Copy(w, &r.postamble)
+	return err
 }

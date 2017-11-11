@@ -6,6 +6,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -42,10 +44,10 @@ func main() {
 	flag.BoolVar(&beVerbose, "v", false, "Be verbose.")
 	outputPath := flag.String("o", "-", "Output to this.")
 	flag.Parse()
-	if flag.NArg() < 2 {
+	if flag.NArg() < 1 {
 		flag.Usage()
 	}
-	err := Amalgamate(*outputPath, flag.Arg(0))
+	err := AmalgamateToFile(*outputPath, flag.Arg(0))
 	if err != nil {
 		logger.Errorf("amalgamation failed (%v)", err)
 		os.Exit(1)
@@ -54,6 +56,36 @@ func main() {
 }
 
 // Amalgamete performs *.hpp amalgamation starting from inputPath.
-func Amalgamate(outputPath string, inputPath string) error {
+func AmalgamateToFile(outputPath string, inputPath string) error {
+	if len(outputPath) == 0 || outputPath == "-" {
+		return Amalgamate(os.Stdout, inputPath)
+	}
+	outDir := filepath.Dir(outputPath)
+	tmpOut, err := ioutil.TempFile(outDir, "tmp-")
+	if err != nil {
+		return err
+	}
+	defer (func() {
+		tmpOut.Close()
+		_ = os.Remove(tmpOut.Name())
+	})()
+	err = Amalgamate(tmpOut, inputPath)
+	if err != nil {
+		return err
+	}
+	tmpOut.Close()
+	err = os.Rename(tmpOut.Name(), outputPath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func Amalgamate(output io.Writer, inputPath string) error {
+	amalgamizer, err := NewAmalgamizer(output)
+	err = amalgamizer.Apply(inputPath)
+	if err != nil {
+		return err
+	}
 	return nil
 }

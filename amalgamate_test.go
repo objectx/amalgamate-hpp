@@ -20,6 +20,10 @@ func TestAmalgamizer_Apply(t *testing.T) {
 					expected := `/*
  * Preamble test
  */
+#pragma once
+#ifndef test_hpp__c24d74e8b3ea1d81019cf4a6cd7c200bac159d06697a1a7de46b535042e78954
+#define test_hpp__c24d74e8b3ea1d81019cf4a6cd7c200bac159d06697a1a7de46b535042e78954	1
+#include <sys/types.h>
 
 /*
  * Preamble child
@@ -41,6 +45,7 @@ mokeke
 gugugu
 #endif
 
+#endif	/* test_hpp__c24d74e8b3ea1d81019cf4a6cd7c200bac159d06697a1a7de46b535042e78954 */
 /*
  * Postamble test
  */
