@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	beVerbose = false
-	progPath  string
-	progName  string
-	logger    *zap.SugaredLogger
+	beVerbose    = false
+	progPath     string
+	progName     string
+	logger       *zap.SugaredLogger
+	loggerConfig zap.Config
 )
 
 func init() {
@@ -28,7 +29,9 @@ func init() {
 		progPath = "amalgamate-hpp"
 	}
 	progName = filepath.Base(progPath)
-	l, err := zap.NewDevelopment()
+	loggerConfig = zap.NewDevelopmentConfig()
+	loggerConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+	l, err := loggerConfig.Build()
 	if err != nil {
 		panic(err)
 	}
@@ -46,6 +49,9 @@ func main() {
 	flag.Parse()
 	if flag.NArg() < 1 {
 		flag.Usage()
+	}
+	if beVerbose {
+		loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	}
 	err := AmalgamateToFile(*outputPath, flag.Arg(0))
 	if err != nil {

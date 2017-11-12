@@ -48,7 +48,6 @@ type Amalgamizer struct {
 	output         io.Writer
 	systemIncludes FileList
 	localIncludes  FileList
-	sourceRoot     string
 	contexts       []*readContext
 }
 
@@ -79,7 +78,6 @@ func NewAmalgamizer(out io.Writer) (*Amalgamizer, error) {
 }
 
 func (a *Amalgamizer) Clear() {
-	a.sourceRoot = ""
 	a.systemIncludes.Clear()
 	a.localIncludes.Clear()
 	a.contexts = nil
@@ -87,8 +85,11 @@ func (a *Amalgamizer) Clear() {
 
 func (a *Amalgamizer) Apply(inputPath string) error {
 	a.Clear()
-	a.sourceRoot = filepath.Dir(inputPath)
-	r, err := a.applyInternal(inputPath)
+	absPath, err := filepath.Abs(inputPath)
+	if err != nil {
+		return err
+	}
+	r, err := a.applyInternal(filepath.ToSlash(absPath))
 	if err != nil {
 		return err
 	}
@@ -117,6 +118,7 @@ func (a *Amalgamizer) Apply(inputPath string) error {
 }
 
 func (a *Amalgamizer) applyInternal(inputPath string) (*includeResult, error) {
+	sourceRoot := filepath.Dir(inputPath)
 	ctx, err := newReadContext(inputPath)
 	if err != nil {
 		return nil, err
@@ -159,11 +161,12 @@ func (a *Amalgamizer) applyInternal(inputPath string) (*includeResult, error) {
 			}
 			if inc := findLocalInclude(txt); 0 < len(inc) {
 				logger.Debugf("Local include: %s", inc)
+				inc = filepath.ToSlash(filepath.Clean(filepath.Join(sourceRoot, inc)))
 				if a.localIncludes.FindIndex(inc) < 0 {
 					// Newly found local include file.
 					// Expand to here.
 					a.localIncludes.Register(inc)
-					r, err := a.applyInternal(filepath.Join(a.sourceRoot, inc))
+					r, err := a.applyInternal(inc)
 					if err != nil {
 						return nil, err
 					}
