@@ -1,47 +1,31 @@
 package main
 
 import (
+	"reflect"
 	"sort"
 	"testing"
 
+	"github.com/ToQoz/gopwt/assert"
 	"github.com/leanovate/gopter"
-	"github.com/leanovate/gopter/convey"
 	"github.com/leanovate/gopter/gen"
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/leanovate/gopter/prop"
 )
 
 func TestFileList_Register(t *testing.T) {
-	Convey("Test Register", t, func() {
-		Convey("GIVEN: A FileList", func() {
-			var fl FileList
-			Convey("WHEN: Add an item", func() {
-				idx := fl.Register("a")
-				Convey("THEN: Index should be 0", func() {
-					So(idx, ShouldEqual, 0)
-				})
-				Convey("AND WHEN: Add another item", func() {
-					idx2 := fl.Register("b")
-					Convey("THEN: Index should be 1", func() {
-						So(idx2, ShouldEqual, 1)
-						Convey("AND THEN: Contents should match", func() {
-							So(fl.Items(), ShouldResemble, []string{"a", "b"})
-						})
-					})
-					Convey("AND WHEN: Add same item", func() {
-						idx3 := fl.Register("a")
-						Convey("THEN: Index should be 0", func() {
-							So(idx3, ShouldEqual, 0)
-						})
-					})
-				})
-			})
-		})
-	})
+	var fl FileList
+	idx := fl.Register("a")
+	assert.OK(t, idx == 0)
+	idx2 := fl.Register("b")
+	assert.OK(t, idx2 == 1)
+	assert.OK(t, reflect.DeepEqual(fl.Items(), []string{"a", "b"}))
+	idx3 := fl.Register("a")
+	assert.OK(t, idx3 == 0)
 }
 
 func TestFileList_Register2(t *testing.T) {
-	Convey("Test FileList properties", t, func() {
-		prop := func(paths []string) bool {
+	properties := gopter.NewProperties(nil)
+	{
+		cond := func(paths []string) bool {
 			//t.Log("paths ", paths)
 			var fl1 FileList
 			for _, p := range paths {
@@ -62,12 +46,14 @@ func TestFileList_Register2(t *testing.T) {
 			}
 			return true
 		}
-		So(prop, convey.ShouldSucceedForAll, genItems())
-	})
+		properties.Property("FileList property", prop.ForAll(cond, genItems()))
+	}
+	properties.TestingRun(t)
 }
 
 func TestFileList_FindIndex(t *testing.T) {
-	prop := func(items []string) bool {
+	properties := gopter.NewProperties(nil)
+	cond := func(items []string) bool {
 		var fl FileList
 		// t.Log("items =", items)
 		registerItems(&fl, items)
@@ -77,7 +63,7 @@ func TestFileList_FindIndex(t *testing.T) {
 			if idx < 0 {
 				return false
 			}
-			//t.Log("i =", i, " v = ", v, " idx =", idx)
+			// t.Log("i =", i, " v = ", v, " idx =", idx)
 			if i < idx {
 				t.Log("i =", i, " v =", v, " idx =", idx)
 				return false
@@ -85,9 +71,8 @@ func TestFileList_FindIndex(t *testing.T) {
 		}
 		return true
 	}
-	Convey("Testing FindIndex", t, func() {
-		So(prop, convey.ShouldSucceedForAll, genItems())
-	})
+	properties.Property("FileIndex property", prop.ForAll(cond, genItems()))
+	properties.TestingRun(t)
 }
 
 func registerItems(fl *FileList, items []string) {
